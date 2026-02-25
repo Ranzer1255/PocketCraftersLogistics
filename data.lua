@@ -3,11 +3,9 @@ data:extend({
     type = "shortcut",
     name = "pc-request-shortcut",
     action = "lua",
-    -- The main icon
-    icon = "__base__/graphics/icons/coin.png",
+    icon = "__core__/graphics/icons/technology/effect/effect-logistic-slots.png",
     icon_size = 64,
-    -- The small icon (required for the selection menu)
-    small_icon = "__base__/graphics/icons/coin.png",
+    small_icon = "__core__/graphics/icons/technology/effect/effect-logistic-slots.png",
     small_icon_size = 64,
     
     localised_name = "Request items to Craft Held item",

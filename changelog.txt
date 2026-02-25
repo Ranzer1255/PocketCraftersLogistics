@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 1.0.1
+Date: 2026-02-25
+  Gui:
+    - updated the icon on the shortcut
+  Balancing:
+    - now requires the Logistic robotics technology to be unlocked
+---------------------------------------------------------------------------------------------------
 Version: 1.0.0
 Date: 2026-02-25
   Features:

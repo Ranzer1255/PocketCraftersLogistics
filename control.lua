@@ -97,9 +97,12 @@ local function process_requests(player)
 
     
     --add list to requester group
+    local multiplier = settings.get_player_settings(player)["pc-craft-order-multiple"].value
+
     section = point.add_section()
     section.filters = filters
     section.active = true
+    section.multiplier=multiplier
 end
 
 

@@ -11,26 +11,51 @@ local function getItemInHand(player)
     if player.cursor_ghost then
         itemName = player.cursor_ghost.name.name
     end
-    
+
     return itemName
 end
 
--- TODO: We'll come back to this idea later
--- --recursively generates the list of items needed to craft the supplied recipe 
--- local function getReqirements(item,count,requirements,network)
---     recipe = prototypes.recipe[item]
-    
 
---     inNetwork = network.get_item_count(item)
---     if (inNetwork>=count or not (recipe.category=="crafting")) then
---         requirements[item]=(requirements[item] or 0) + count
---     else
---         craftsNeeded = math.ceil(count / recipe.products[1].amount)
---         for _, ingredient in pairs(recipe.ingredients) do
---             getReqirements(ingredient.name,ingredient.amount*craftsNeeded,requirements,network)
---         end
---     end
--- end
+local function isHandCraftable(itemRecipeCategory)
+    local handCraftCategories = prototypes.entity["character"].crafting_categories
+    if handCraftCategories then 
+        return handCraftCategories[itemRecipeCategory] or false
+    end
+    return false
+end
+
+
+--generates the list of items needed to craft the supplied recipe 
+local function getNetworkReqirements(baseRequirements,network)
+    local finalRequirements = {}
+    while next(baseRequirements) ~= nil do
+        
+        local itemName, ammount = next(baseRequirements)
+        if not itemName then break end
+        baseRequirements[itemName]=nil
+
+        local recipe = prototypes.recipe[itemName]
+
+        if 
+            not recipe or --there's no recipe
+            not isHandCraftable(recipe.category) or --we can't craft it
+            ((network.get_item_count(itemName) - (finalRequirements[itemName] or 0))  >= ammount) --we have enough if it on hand
+        then
+            finalRequirements[itemName] = (finalRequirements[itemName] or 0) + ammount
+        else
+            local recipe = prototypes.recipe[itemName]
+            local yeld = recipe.products[1].amount
+            local craftsNeeded = math.ceil(ammount/yeld)
+
+            --add the ingredients to the queue 
+            for _, ingredient in pairs(prototypes.recipe[itemName].ingredients) do
+                baseRequirements[ingredient.name] = (baseRequirements[ingredient.name] or 0) + (ingredient.amount * craftsNeeded)
+            end
+        end
+    end
+    return finalRequirements
+end
+
 
 local function process_requests(player)
 
@@ -40,11 +65,11 @@ local function process_requests(player)
     --guard clause: No item in player's hand or it isn't a craftable item
     if not itemName then
         player.print("no item selected or item has no recipe")
-        return;
+        return
     end
-    
+
     --Guard clause: check if recipe is handcraftable
-    if not (prototypes.recipe[itemName].category=="crafting") then
+    if not (isHandCraftable(prototypes.recipe[itemName].category)) then
         player.print("item is not handcraftable")
         return
     end
@@ -59,25 +84,28 @@ local function process_requests(player)
     local point = player.character.get_requester_point()
 
     --Guard clause: Player has not unlocked logistics yet
-    if not point then 
+    if not point then
         player.print("no logistics")
         return
     end
 
-    --[[
-    local network = player.force.find_logistic_network_by_position(player.position,player.surface)
-
-    
-    if not network then
-        player.print("no network found in logistics range?") --todo fail to a default request of just the recipe
-        return
+    local network
+    if settings.get_player_settings(player)["pc-recuseive-ordering"].value then
+        network = player.force.find_logistic_network_by_position(player.position,player.surface)
     end
-    ]]--
 
     --get list of required items to craft item
+    local baseRequirements = {}
     local requirements = {}
+
     for _, ingredient in pairs(prototypes.recipe[itemName].ingredients) do
-       requirements[ingredient.name] = ingredient.amount
+        baseRequirements[ingredient.name] = ingredient.amount
+    end
+
+    if not network then --either the player has disabled recursive ordering or they are not in logistics range
+        requirements = baseRequirements
+    else
+        requirements = getNetworkReqirements(baseRequirements,network)
     end
 
     --requirements will be useful when i start recursively generating additional items based on what's availble in the Logistics network
@@ -95,7 +123,7 @@ local function process_requests(player)
     end
 
 
-    
+
     --add list to requester group
     local multiplier = settings.get_player_settings(player)["pc-craft-order-multiple"].value
 

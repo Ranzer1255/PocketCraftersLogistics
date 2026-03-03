@@ -89,20 +89,23 @@ local function process_requests(player)
         return
     end
 
-    --[[
-    local network = player.force.find_logistic_network_by_position(player.position,player.surface)
-
-    
-    if not network then
-        player.print("no network found in logistics range?") --todo fail to a default request of just the recipe
-        return
+    local network
+    if settings.get_player_settings(player)["pc-recuseive-ordering"].value then
+        network = player.force.find_logistic_network_by_position(player.position,player.surface)
     end
-    ]]--
 
     --get list of required items to craft item
+    local baseRequirements = {}
     local requirements = {}
+
     for _, ingredient in pairs(prototypes.recipe[itemName].ingredients) do
-       requirements[ingredient.name] = ingredient.amount
+        baseRequirements[ingredient.name] = ingredient.amount
+    end
+
+    if not network then --either the player has disabled recursive ordering or they are not in logistics range
+        requirements = baseRequirements
+    else
+        requirements = getNetworkReqirements(baseRequirements,network)
     end
 
     --requirements will be useful when i start recursively generating additional items based on what's availble in the Logistics network
@@ -120,7 +123,7 @@ local function process_requests(player)
     end
 
 
-    
+
     --add list to requester group
     local multiplier = settings.get_player_settings(player)["pc-craft-order-multiple"].value
 

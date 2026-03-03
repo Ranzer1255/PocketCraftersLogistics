@@ -7,3 +7,12 @@ data:extend({
         setting_type = "runtime-per-user"
     }
 })
+
+data:extend({
+    {
+        name = "pc-recuseive-ordering",
+        type = "bool-setting",
+        default_value = true,
+        setting_type = "runtime-per-user"
+    }
+})

@@ -16,10 +16,12 @@ local function getItemInHand(player)
 end
 
 
-local function isHandCraftable(itemRecipeCategory)
+local function isHandCraftable(itemRecipeCategories)
     local handCraftCategories = prototypes.entity["character"].crafting_categories
     if handCraftCategories then 
-        return handCraftCategories[itemRecipeCategory] or false
+        for _, itemRecipeCategory in pairs(itemRecipeCategories) do
+            return handCraftCategories[itemRecipeCategory]
+        end
     end
     return false
 end
@@ -38,7 +40,7 @@ local function getNetworkReqirements(baseRequirements,network)
 
         if 
             not recipe or --there's no recipe
-            not isHandCraftable(recipe.category) or --we can't craft it
+            not isHandCraftable(recipe.categories) or --we can't craft it
             ((network.get_item_count(itemName) - (finalRequirements[itemName] or 0))  >= ammount) --we have enough if it on hand
         then
             finalRequirements[itemName] = (finalRequirements[itemName] or 0) + ammount
@@ -68,12 +70,6 @@ local function process_requests(player)
         return
     end
 
-    --Guard clause: check if recipe is handcraftable
-    if not (isHandCraftable(prototypes.recipe[itemName].category)) then
-        player.print("item is not handcraftable")
-        return
-    end
-
     --guard clause, player has no physical body. 
     if not player.character then
         player.print("no character")
@@ -81,7 +77,18 @@ local function process_requests(player)
     end
 
     --get logistics network objects
-    local point = player.character.get_requester_point()
+    local point
+    local opened = player.opened
+    if player.opened and opened.get_requester_point() then
+        point = opened.get_requester_point()
+    else
+        --Guard clause: check if recipe is handcraftable
+        if not (isHandCraftable(prototypes.recipe[itemName].categories)) then
+            player.print("item is not handcraftable")
+            return
+        end
+        point = player.character.get_requester_point()
+    end
 
     --Guard clause: Player has not unlocked logistics yet
     if not point then
@@ -99,7 +106,9 @@ local function process_requests(player)
     local requirements = {}
 
     for _, ingredient in pairs(prototypes.recipe[itemName].ingredients) do
-        baseRequirements[ingredient.name] = ingredient.amount
+        if ingredient.type == "item" then
+            baseRequirements[ingredient.name] = ingredient.amount
+        end
     end
 
     if not network then --either the player has disabled recursive ordering or they are not in logistics range

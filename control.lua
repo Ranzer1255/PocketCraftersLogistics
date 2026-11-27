@@ -63,7 +63,9 @@ local function getNetworkReqirements(baseRequirements,network)
 end
 
 
-local function process_requests(player)
+-- craftCount: how many crafts to request for (1, 5, 10...). Multiplied with the player's Order Multiplier setting.
+local function process_requests(player, craftCount)
+    craftCount = craftCount or 1
 
     --get Recipe for item in player's hand
     local itemName = getItemInHand(player)
@@ -131,7 +133,7 @@ local function process_requests(player)
 
 
     --add list to requester group
-    local multiplier = settings.get_player_settings(player)["pc-craft-order-multiple"].value
+    local multiplier = settings.get_player_settings(player)["pc-craft-order-multiple"].value * craftCount
 
     section = point.add_section()
     section.filters = filters
@@ -145,4 +147,87 @@ script.on_event(defines.events.on_lua_shortcut, function(event)
     if event.prototype_name == "pc-request-shortcut" then
         process_requests(game.get_player(event.player_index))
     end
+end)
+
+
+--------------------------------------------------------------------------------
+-- Top-left mod GUI button: left-click = 1x, right-click = 5x, shift+click = 10x, ctrl+shift+click = 100x
+-- (the shortcut bar can't tell which mouse button / modifier was used)
+--------------------------------------------------------------------------------
+local mod_gui = require("mod-gui")
+
+local BUTTON_NAME = "pc-request-button"
+local UNLOCK_TECH = "logistic-robotics" -- same tech that unlocks the shortcut
+
+local function isUnlocked(force)
+    local tech = force.technologies[UNLOCK_TECH]
+    return (not tech) or tech.researched -- if a mod removed the tech, don't hide the button forever
+end
+
+-- add the button once research is done, remove it if research is reversed.
+-- Only touches mod_gui.get_button_flow when unlocked, because that call creates
+-- the shared top-left frame and would leave an empty box on screen otherwise.
+local function updateButton(player)
+    if isUnlocked(player.force) then
+        local flow = mod_gui.get_button_flow(player)
+        if not flow[BUTTON_NAME] then
+            flow.add{
+                type = "sprite-button",
+                name = BUTTON_NAME,
+                sprite = "pc-request-button-sprite",
+                style = mod_gui.button_style,
+                tooltip = {"pc-gui.request-button-tooltip"}
+            }
+        end
+    else
+        local frame = player.gui.top.mod_gui_top_frame
+        local flow = (frame and frame.mod_gui_inner_frame) or player.gui.top.mod_gui_button_flow
+        if flow and flow[BUTTON_NAME] then
+            flow[BUTTON_NAME].destroy()
+        end
+    end
+end
+
+local function updateAllButtons()
+    for _, player in pairs(game.players) do
+        updateButton(player)
+    end
+end
+
+local function updateForceButtons(force)
+    for _, player in pairs(force.players) do
+        updateButton(player)
+    end
+end
+
+script.on_init(updateAllButtons)
+script.on_configuration_changed(updateAllButtons)
+
+script.on_event(defines.events.on_player_created, function(event)
+    updateButton(game.get_player(event.player_index))
+end)
+
+script.on_event(defines.events.on_player_changed_force, function(event)
+    updateButton(game.get_player(event.player_index))
+end)
+
+script.on_event({defines.events.on_research_finished, defines.events.on_research_reversed}, function(event)
+    if event.research.name == UNLOCK_TECH then
+        updateForceButtons(event.research.force)
+    end
+end)
+
+script.on_event(defines.events.on_gui_click, function(event)
+    if not (event.element and event.element.valid and event.element.name == BUTTON_NAME) then return end
+
+    local craftCount = 1
+    if event.shift and event.control then
+        craftCount = 100
+    elseif event.shift then
+        craftCount = 10
+    elseif event.button == defines.mouse_button_type.right then
+        craftCount = 5
+    end
+
+    process_requests(game.get_player(event.player_index), craftCount)
 end)

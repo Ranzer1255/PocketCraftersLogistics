@@ -16,10 +16,16 @@ local function getItemInHand(player)
 end
 
 
-local function isHandCraftable(itemRecipeCategory)
+-- returns true if any of the recipe's categories can be crafted by the character
+-- (2.1 replaced LuaRecipePrototype.category with the categories array)
+local function isHandCraftable(recipe)
+    if not recipe then return false end
     local handCraftCategories = prototypes.entity["character"].crafting_categories
-    if handCraftCategories then 
-        return handCraftCategories[itemRecipeCategory] or false
+    if not handCraftCategories then return false end
+    for _, category in pairs(recipe.categories) do
+        if handCraftCategories[category] then
+            return true
+        end
     end
     return false
 end
@@ -38,7 +44,7 @@ local function getNetworkReqirements(baseRequirements,network)
 
         if 
             not recipe or --there's no recipe
-            not isHandCraftable(recipe.category) or --we can't craft it
+            not isHandCraftable(recipe) or --we can't craft it
             ((network.get_item_count(itemName) - (finalRequirements[itemName] or 0))  >= ammount) --we have enough if it on hand
         then
             finalRequirements[itemName] = (finalRequirements[itemName] or 0) + ammount
@@ -69,7 +75,7 @@ local function process_requests(player)
     end
 
     --Guard clause: check if recipe is handcraftable
-    if not (isHandCraftable(prototypes.recipe[itemName].category)) then
+    if not (isHandCraftable(prototypes.recipe[itemName])) then
         player.print("item is not handcraftable")
         return
     end
